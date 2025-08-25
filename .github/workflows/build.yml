@@ -1,0 +1,91 @@
+# .github/workflows/build.yml
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main, master, develop ]  # 在这些分支有推送时触发
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 设置Java环境
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+        
+    - name: 设置Flutter环境
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'  # 指定Flutter版本，可以改为'stable'使用最新稳定版
+        channel: 'stable'
+        
+    - name: 验证Flutter安装
+      run: flutter doctor -v
+      
+    - name: 获取依赖
+      run: flutter pub get
+      
+    - name: 运行代码分析
+      run: flutter analyze
+      
+    - name: 运行测试 (可选)
+      run: flutter test
+      continue-on-error: true  # 测试失败不阻止编译
+      
+    - name: 编译APK (Debug版本)
+      run: flutter build apk --debug
+      
+    - name: 编译APK (Release版本)
+      run: flutter build apk --release
+      
+    - name: 编译APK (Split版本 - 可选)
+      run: flutter build apk --split-per-abi --release
+      continue-on-error: true
+      
+    - name: 上传APK文件
+      uses: actions/upload-artifact@v4
+      with:
+        name: flutter-apks
+        path: |
+          build/app/outputs/flutter-apk/app-debug.apk
+          build/app/outputs/flutter-apk/app-release.apk
+          build/app/outputs/flutter-apk/app-*-release.apk
+        retention-days: 30  # 保存30天
+        
+    - name: 获取版本信息
+      id: version
+      run: |
+        VERSION=$(grep 'version:' pubspec.yaml | cut -d ' ' -f 2)
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "构建版本: $VERSION"
+        
+    - name: 创建Release (可选)
+      if: startsWith(github.ref, 'refs/tags/')  # 只在tag推送时创建release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/app/outputs/flutter-apk/app-release.apk
+          build/app/outputs/flutter-apk/app-*-release.apk
+        name: Release ${{ steps.version.outputs.VERSION }}
+        body: |
+          自动编译的APK文件
+          
+          **变更内容:**
+          - 查看commit历史获取详细变更信息
+          
+          **下载说明:**
+          - `app-release.apk`: 通用版本 (推荐)
+          - `app-arm64-v8a-release.apk`: 64位ARM设备专用
+          - `app-armeabi-v7a-release.apk`: 32位ARM设备专用
+          - `app-x86_64-release.apk`: 64位x86设备专用
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
