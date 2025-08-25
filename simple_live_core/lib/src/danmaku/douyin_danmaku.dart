@@ -41,7 +41,7 @@ class DouyinDanmaku implements LiveDanmaku {
   Function(String msg)? onClose;
   @override
   Function()? onReady;
-  String serverUrl = "wss://webcast3-ws-web-lq.douyin.com/webcast/im/push/v2/";
+  String serverUrl = "wss://webcast100-ws-web-lq.douyin.com/webcast/im/push/v2/";
   late DouyinDanmakuArgs danmakuArgs;
   WebScoketUtils? webScoketUtils;
 
